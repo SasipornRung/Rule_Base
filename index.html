@@ -3,23 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Condo Smart Filter</title>
+    <title>Condo Smart Search (Prototype)</title>
     <style>
         body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
         h1 { text-align: center; }
-        /* นี่คือส่วนของฟอร์มควบคุม */
+        /* *** นี่คือส่วนของฟอร์มค้นหาที่แก้ไขใหม่ *** */
         .controls {
             background: #fff; padding: 20px; border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex; gap: 20px; align-items: center;
+            display: flex; gap: 10px; align-items: center;
             justify-content: center; margin-bottom: 20px;
         }
         .controls label { font-weight: bold; }
-        .controls input[type="number"] { padding: 8px; font-size: 14px; width: 80px; }
-        .controls input[type="checkbox"] { width: 20px; height: 20px; }
+        .controls input[type="text"] { 
+            padding: 10px; font-size: 16px; width: 300px;
+            border: 1px solid #ccc; border-radius: 5px;
+        }
         .controls button {
             padding: 10px 20px; font-size: 16px; cursor: pointer;
-            background: #007bff; color: white; border: none; border-radius: 5px;
+            background: #28a745; color: white; border: none; border-radius: 5px;
         }
         
         /* ส่วนของการ์ดแสดงผล (เหมือนเดิม) */
@@ -38,15 +40,11 @@
 </head>
 <body>
 
-    <h1>ระบบแนะนำคอนโดอัจฉริยะ</h1>
+    <h1>ระบบแนะนำคอนโด (Search Prototype)</h1>
 
     <div class="controls">
-        <label for="distanceInput">เดินไม่เกิน (เมตร):</label>
-        <input type="number" id="distanceInput" placeholder="เช่น 500">
-        
-        <input type="checkbox" id="petCheckbox" style="margin-left: 20px;">
-        <label for="petCheckbox">เลี้ยงสัตว์ได้</label>
-        
+        <label for="searchInput">พิมพ์คำค้นหา:</label>
+        <input type="text" id="searchInput" placeholder="เช่น 'เซียล่า', 'เลี้ยงสัตว์', '0 เมตร'">
         <button id="searchButton">ค้นหา</button>
     </div>
     
@@ -93,12 +91,12 @@
 
         // --- 2. "สมอง" (THE BRAIN) ---
         
-        // (ฟังก์ชันให้คะแนน เหมือนเดิม)
+        // (ฟังก์ชันให้คะแนน เหมือนเดิม - เพื่อจัดลำดับผลลัพธ์)
         function calculateScore(condo) {
             let score = 0;
             score += 1000 / (condo.distance_to_mrt + 1); 
             if (condo.pet_friendly === true) {
-                score += 50; // ให้โบนัสถ้าเลี้ยงสัตว์ได้
+                score += 50; 
             }
             return score;
         }
@@ -106,4 +104,78 @@
         // *** JavaScript ส่วนที่แก้ไข ***
         function findAndDisplayCondos() {
             const container = document.getElementById('resultsContainer');
-            container.innerHTML
+            container.innerHTML = '<h2>กำลังค้นหา...</h2>';
+
+            // 1. "อ่าน" ค่าจาก *ช่องค้นหา* ที่ผู้ใช้พิมพ์
+            // .toLowerCase() เพื่อให้ค้นหาได้ทั้งพิมพ์เล็ก/ใหญ่ (เช่น "ciela" หรือ "Ciela")
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            // ถ้าไม่พิมพ์อะไรเลย ก็แจ้งผู้ใช้
+            if (!searchTerm) {
+                container.innerHTML = '<p>กรุณาพิมพ์คำค้นหา เช่น "เซียล่า", "เลี้ยงสัตว์", หรือ "0 เมตร"</p>';
+                return;
+            }
+
+            // 2. ทำการฟิลเตอร์ (Rule-Based Keyword Search)
+            const filteredResults = condoData.filter(condo => {
+                // ทำให้ข้อมูลในฐานข้อมูลเป็นพิมพ์เล็กก่อนเทียบ
+                const nameMatch = condo.name.toLowerCase().includes(searchTerm);
+                const explanationMatch = condo.explanation_card.toLowerCase().includes(searchTerm);
+                
+                // คืนค่า "จริง" ถ้าพบคำค้นหาใน "ชื่อ" *หรือ* "คำอธิบาย"
+                return nameMatch || explanationMatch;
+            });
+
+            // 3. ให้คะแนน และ จัดลำดับ (เฉพาะผลลัพธ์ที่ค้นหาเจอ)
+            const scoredResults = filteredResults.map(condo => {
+                return {
+                    ...condo,
+                    score: calculateScore(condo)
+                };
+            });
+
+            const sortedResults = scoredResults.sort((a, b) => b.score - a.score);
+
+            // 4. แสดงผล (เหมือนเดิม)
+            container.innerHTML = ''; 
+            
+            if (sortedResults.length === 0) {
+                container.innerHTML = '<p>ไม่พบโครงการที่ตรงกับคำค้นหาของคุณ</p>';
+                return;
+            }
+
+            sortedResults.forEach((condo, index) => {
+                const rank = index + 1;
+                const cardHTML = `
+                    <div class="card">
+                        <span class="rank">#${rank}</span>
+                        <h2>${condo.name}</h2>
+                        <p><strong>เหตุผลที่แนะนำ:</strong> ${condo.explanation_card}</p>
+                        <p>
+                            <small>
+                                <strong>ข้อมูล:</strong> 
+                                (ระยะทาง: ${condo.distance_to_mrt} ม. | 
+                                เลี้ยงสัตว์: ${condo.pet_friendly ? 'ได้' : 'ไม่ได้'} | 
+                                คะแนน: ${Math.round(condo.score)})
+                            </small>
+                        </p>
+                    </div>
+                `;
+                container.innerHTML += cardHTML;
+            });
+        }
+
+        // สั่งให้ปุ่ม #searchButton ทำงานเมื่อถูกคลิก
+        document.getElementById('searchButton').addEventListener('click', findAndDisplayCondos);
+        
+        // (โบนัส) สั่งให้ปุ่ม Enter ที่คีย์บอร์ดทำงานด้วย
+        document.getElementById('searchInput').addEventListener('keyup', function(event) {
+            if (event.key === "Enter") {
+                findAndDisplayCondos();
+            }
+        });
+
+    </script>
+
+</body>
+</html>
