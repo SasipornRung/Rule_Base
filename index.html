@@ -7,10 +7,22 @@
     <style>
         body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
         h1 { text-align: center; }
-        button { 
-            display: block; margin: 20px auto; padding: 10px 20px; 
-            font-size: 16px; cursor: pointer; 
+        /* นี่คือส่วนของฟอร์มควบคุม */
+        .controls {
+            background: #fff; padding: 20px; border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex; gap: 20px; align-items: center;
+            justify-content: center; margin-bottom: 20px;
         }
+        .controls label { font-weight: bold; }
+        .controls input[type="number"] { padding: 8px; font-size: 14px; width: 80px; }
+        .controls input[type="checkbox"] { width: 20px; height: 20px; }
+        .controls button {
+            padding: 10px 20px; font-size: 16px; cursor: pointer;
+            background: #007bff; color: white; border: none; border-radius: 5px;
+        }
+        
+        /* ส่วนของการ์ดแสดงผล (เหมือนเดิม) */
         .card-container { display: flex; flex-direction: column; gap: 15px; }
         .card { 
             background: #fff; border: 1px solid #ddd; border-radius: 8px; 
@@ -27,16 +39,23 @@
 <body>
 
     <h1>ระบบแนะนำคอนโดอัจฉริยะ</h1>
-    <button id="findButton">
-        ค้นหา: "สนใจคอนโดแถวท่าพระ สามารถเดินไปรถไฟฟ้าได้"
-    </button>
+
+    <div class="controls">
+        <label for="distanceInput">เดินไม่เกิน (เมตร):</label>
+        <input type="number" id="distanceInput" placeholder="เช่น 500">
+        
+        <input type="checkbox" id="petCheckbox" style="margin-left: 20px;">
+        <label for="petCheckbox">เลี้ยงสัตว์ได้</label>
+        
+        <button id="searchButton">ค้นหา</button>
+    </div>
     
     <div id="resultsContainer" class="card-container">
         </div>
 
     <script>
         // --- 1. ฐานข้อมูล (THE JSON DATABASE) ---
-        // ปกติข้อมูลนี้จะถูกโหลดมาจากไฟล์ .json หรือ Database
+        // (เหมือนเดิม)
         const condoData = [
           {
             "id": 1,
@@ -74,95 +93,17 @@
 
         // --- 2. "สมอง" (THE BRAIN) ---
         
-        // นี่คือ "กฎ" ที่เราจำลองว่า NLP ตีความมาจากคำพูดของลูกค้า
-        const USER_REQUEST = {
-            area: "Thaphra",
-            max_walk_distance: 500 // "สามารถเดินไปรถไฟฟ้าได้" (ตีความเป็น <= 500 เมตร)
-            // เราสามารถเพิ่มเงื่อนไขอื่นๆ เช่น pet_friendly: true ได้ที่นี่
-        };
-
-        // ฟังก์ชันในการ "ให้คะแนน" (Scoring)
+        // (ฟังก์ชันให้คะแนน เหมือนเดิม)
         function calculateScore(condo) {
             let score = 0;
-            
-            // เงื่อนไขหลัก: ยิ่งใกล้ MRT ยิ่งได้คะแนนเยอะ
-            // เรากลับค่า (inverse) เพื่อให้ระยะทาง 0 ได้คะแนนสูงสุด
-            // เราบวก 1 เพื่อไม่ให้หารด้วย 0
             score += 1000 / (condo.distance_to_mrt + 1); 
-
-            // (ตัวอย่าง) เงื่อนไขโบนัส: ถ้าเลี้ยงสัตว์ได้ ให้บวก 50 คะแนน
             if (condo.pet_friendly === true) {
-                score += 50;
+                score += 50; // ให้โบนัสถ้าเลี้ยงสัตว์ได้
             }
-            
             return score;
         }
 
-        // ฟังก์ชันหลักในการค้นหาและแสดงผล
+        // *** JavaScript ส่วนที่แก้ไข ***
         function findAndDisplayCondos() {
-            console.log("Starting search...");
             const container = document.getElementById('resultsContainer');
-            container.innerHTML = '<h2>กำลังค้นหา...</h2>'; // เคลียร์ผลลัพธ์เก่า
-
-            // --- 3. การทำงานของ RULE-BASE ---
-
-            // ขั้นตอนที่ 1: กรอง (Filter) เฉพาะอันที่ตรงเงื่อนไข "พื้นที่"
-            const filteredByArea = condoData.filter(condo => {
-                return condo.area === USER_REQUEST.area;
-            });
-
-            // ขั้นตอนที่ 2: ให้คะแนน (Scoring) และ กรอง (Filter) อันที่เดินไม่ได้ออก
-            const scoredResults = filteredByArea
-                .map(condo => {
-                    return {
-                        ...condo, // เอาข้อมูลคอนโดเดิมมาทั้งหมด
-                        score: calculateScore(condo) // เพิ่มคะแนนเข้าไป
-                    };
-                })
-                .filter(condo => {
-                    // กรองอันที่ "เดินไม่ได้" (เกิน 500ม.) ออก
-                    return condo.distance_to_mrt <= USER_REQUEST.max_walk_distance;
-                });
-
-            // ขั้นตอนที่ 3: จัดลำดับ (Rank) จากคะแนนมากไปน้อย
-            const sortedResults = scoredResults.sort((a, b) => b.score - a.score);
-
-            // --- 4. การแสดงผล (DISPLAY) ---
-            container.innerHTML = ''; // เคลียร์ "กำลังค้นหา..."
-            
-            if (sortedResults.length === 0) {
-                container.innerHTML = '<p>ไม่พบโครงการที่ตรงกับเงื่อนไขของคุณ</p>';
-                return;
-            }
-
-            // วนลูปสร้างการ์ด
-            sortedResults.forEach((condo, index) => {
-                const rank = index + 1;
-                const cardHTML = `
-                    <div class="card">
-                        <span class="rank">#${rank}</span>
-                        <h2>${condo.name}</h2>
-                        <p><strong>เหตุผลที่แนะนำ:</strong> 
-                           ${condo.explanation_card} 
-                           </p>
-                        <p>
-                            <small>
-                                <strong>ข้อมูล:</strong> 
-                                (ระยะทาง: ${condo.distance_to_mrt} ม. | 
-                                เลี้ยงสัตว์: ${condo.pet_friendly ? 'ได้' : 'ไม่ได้'} | 
-                                คะแนน: ${Math.round(condo.score)})
-                            </small>
-                        </p>
-                    </div>
-                `;
-                container.innerHTML += cardHTML;
-            });
-        }
-
-        // สั่งให้ปุ่ม #findButton ทำงานเมื่อถูกคลิก
-        document.getElementById('findButton').addEventListener('click', findAndDisplayCondos);
-
-    </script>
-
-</body>
-</html>
+            container.innerHTML
